@@ -1,0 +1,48 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+    - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust and musl target
+      run: |
+        rustup update stable
+        rustup target add x86_64-unknown-linux-musl
+
+    - name: Install musl tools
+      run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+    - name: Build (Debug, musl, static)
+      run: |
+        cargo build --target x86_64-unknown-linux-musl
+
+    - name: Run Tests (Debug)
+      run: |
+        cargo test --target x86_64-unknown-linux-musl
+
+    - name: Build Release (musl, static)
+      if: success()
+      run: |
+        cargo build --release --target x86_64-unknown-linux-musl
+
+    - name: Archive Debug Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ducksync-debug
+        path: target/x86_64-unknown-linux-musl/debug/ducksync
+
+    - name: Archive Release Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ducksync-release
+        path: target/x86_64-unknown-linux-musl/release/ducksync
