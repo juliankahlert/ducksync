@@ -1,8 +1,7 @@
 use clap::Parser;
 use ducksync::config::{Config, Ip};
 use ducksync::duckdns::DuckDns;
-use reqwest::Client;
-use std::net::IpAddr;
+use ducksync::ipify::Ipify;
 
 #[derive(Parser, Debug)]
 #[command(name = "ducksync")]
@@ -11,38 +10,11 @@ struct Args {
     config: Option<String>,
 }
 
-async fn resolve_public_ip() -> Result<IpAddr, String> {
-    let client = Client::new();
-    let public_ip: String = client
-        .get("https://api.ipify.org?format=text")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    public_ip.parse::<IpAddr>().map_err(|e| e.to_string())
-}
-
-async fn resolve_public_ipv6() -> Result<IpAddr, String> {
-    let client = reqwest::Client::new();
-    let public_ip: String = client
-        .get("https://api6.ipify.org?format=text")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    public_ip.parse::<IpAddr>().map_err(|e| e.to_string())
-}
-
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     let duckdns = DuckDns::new();
+    let ipify = Ipify::new();
 
     match Config::load(args.config).await {
         Ok(config) => {
@@ -52,9 +24,9 @@ async fn main() {
                 println!("{:?}", domain);
 
                 if let Some(Ip::Public) = domain.ip {
-                    let res = match resolve_public_ipv6().await {
+                    let res = match ipify.ipv6().await {
                         Ok(ip) => Ok(ip),
-                        Err(_) => resolve_public_ip().await,
+                        Err(_) => ipify.ipv4().await,
                     };
 
                     let Ok(ip) = res else {
