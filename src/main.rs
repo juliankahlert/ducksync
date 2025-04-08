@@ -1,5 +1,6 @@
 use clap::Parser;
 use directories::BaseDirs;
+use ducksync::duckdns::DuckDns;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -118,111 +119,10 @@ async fn load_config(config_path: Option<String>) -> io::Result<Config> {
     Ok(config)
 }
 
-use std::collections::HashMap;
-
-pub struct DuckDns;
-
-impl DuckDns {
-    // Update the DuckDNS record with the provided parameters.
-    // This will send a request to DuckDNS API to update the IP address for the domains.
-    pub async fn update(
-        domains: Vec<String>,
-        token: String,
-        ip: Option<String>,
-        ipv6: Option<String>,
-        verbose: Option<bool>,
-        clear: Option<bool>,
-    ) -> Result<(), String> {
-        let mut params = HashMap::new();
-        params.insert("domains", domains.join(","));
-        params.insert("token", token);
-
-        if let Some(ip_value) = ip {
-            params.insert("ip", ip_value);
-        }
-
-        if let Some(ipv6_value) = ipv6 {
-            params.insert("ipv6", ipv6_value);
-        }
-
-        if let Some(verbose_value) = verbose {
-            params.insert("verbose", verbose_value.to_string());
-        }
-
-        if let Some(clear_value) = clear {
-            params.insert("clear", clear_value.to_string());
-        }
-
-        let url = "https://www.duckdns.org/update";
-
-        let client = Client::new();
-        let response = client
-            .get(url)
-            .query(&params)
-            .send()
-            .await
-            .map_err(|e| format!("Error sending request: {}", e))?;
-
-        let body = response
-            .text()
-            .await
-            .map_err(|e| format!("Error reading response body: {}", e))?;
-
-        if body.starts_with("OK") {
-            Ok(())
-        } else {
-            Err(format!("Update failed: {}", body))
-        }
-    }
-
-    // Update the DuckDNS TXT record with the provided parameters.
-    // This will send a request to DuckDNS API to update the TXT record for the domains.
-    pub async fn update_txt(
-        domains: Vec<String>,
-        token: String,
-        txt: String,
-        verbose: Option<bool>,
-        clear: Option<bool>,
-    ) -> Result<(), String> {
-        let mut params = HashMap::new();
-        params.insert("domains", domains.join(","));
-        params.insert("token", token);
-        params.insert("txt", txt);
-
-        if let Some(verbose_value) = verbose {
-            params.insert("verbose", verbose_value.to_string());
-        }
-
-        if let Some(clear_value) = clear {
-            params.insert("clear", clear_value.to_string());
-        }
-
-        let url = "https://www.duckdns.org/update";
-
-        let client = Client::new();
-        let response = client
-            .get(url)
-            .query(&params)
-            .send()
-            .await
-            .map_err(|e| format!("Error sending request: {}", e))?;
-
-        let body = response
-            .text()
-            .await
-            .map_err(|e| format!("Error reading response body: {}", e))?;
-
-        if body.starts_with("OK") {
-            Ok(())
-        } else {
-            Err(format!("Update failed: {}", body))
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+    let duckdns = DuckDns::new();
 
     match load_config(args.config).await {
         Ok(config) => {
@@ -242,15 +142,16 @@ async fn main() {
                     };
 
                     println!("IP found for domain {} => {}", &domain.name, &ip);
-                    let res = DuckDns::update(
-                        vec![domain.name.clone()],
-                        domain.token,
-                        Some(ip.to_string()),
-                        None,
-                        None,
-                        None,
-                    )
-                    .await;
+                    let res = duckdns
+                        .update(
+                            vec![domain.name.clone()],
+                            domain.token,
+                            Some(ip.to_string()),
+                            None,
+                            None,
+                            None,
+                        )
+                        .await;
                     println!("{:?}", res);
                 }
             }
