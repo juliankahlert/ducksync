@@ -39,7 +39,9 @@ enum Subs {
     },
 }
 
-async fn update_dns_cmd(domains: Vec<String>, token: String) {
+type IpMap = Vec<(Vec<String>, String)>;
+
+async fn update_dns_cmd(domains: Vec<String>, token: String) -> Result<IpMap, String> {
     let duckdns = DuckDns::new();
     let ipify = Ipify::new();
 
@@ -49,36 +51,34 @@ async fn update_dns_cmd(domains: Vec<String>, token: String) {
     };
 
     let Ok(ip) = res else {
-        return;
+        return Err("Failed to get public ip".to_string());
     };
 
-    println!("IP found for domains {:?} => {}", domains, &ip);
-    let res = duckdns
+    duckdns
         .update(
-            domains,
+            &domains,
             token.clone(),
             Some(ip.to_string()),
             None,
             None,
             None,
         )
-        .await;
-    println!("{:?}", res);
+        .await
+        .map(|_| vec![(domains, ip.to_string())])
 }
 
-async fn config_cmd(file: Option<String>) {
+async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
     let cfg = match Config::load(file).await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Error loading config: {}", e);
-            return;
+            return Err(format!("Error loading config: {}", e));
         }
     };
 
+    let mut map = vec![];
     let duckdns = DuckDns::new();
     let ipify = Ipify::new();
 
-    println!("Successfully loaded config:");
     for domain in cfg.domains {
         if let Some(Ip::Public) = domain.ip {
             let res = match ipify.ipv6().await {
@@ -87,21 +87,42 @@ async fn config_cmd(file: Option<String>) {
             };
 
             let Ok(ip) = res else {
-                continue;
+                return Err("Failed to get public ip".to_string());
             };
 
-            println!("IP found for domain {} => {}", &domain.name, &ip);
-            let res = duckdns
+            let domains = vec![domain.name.clone()];
+            if let Err(_) = duckdns
                 .update(
-                    vec![domain.name.clone()],
+                    &domains,
                     domain.token,
                     Some(ip.to_string()),
                     None,
                     None,
                     None,
                 )
-                .await;
-            println!("{:?}", res);
+                .await
+            {
+                continue;
+            }
+
+            map.push((domains, ip.to_string()));
+        }
+    }
+
+    Ok(map)
+}
+
+fn print_res(res: Result<IpMap, String>) -> bool {
+    match res {
+        Err(e) => {
+            eprintln!("{}", e);
+            false
+        }
+        Ok(ip_map) => {
+            for m in ip_map {
+                println!("{:?} => {}", m.0, m.1);
+            }
+            true
         }
     }
 }
@@ -109,15 +130,20 @@ async fn config_cmd(file: Option<String>) {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-
-    if let Some(sub) = args.command {
-        match sub {
+    let ok = if let Some(sub) = args.command {
+        let res = match sub {
             Subs::Config { config } => config_cmd(Some(config)).await,
             Subs::UpdateDns { domain, token } => update_dns_cmd(domain, token).await,
-            _ => return,
-        }
-        return;
-    }
+            _ => Err("Not supported".to_string()),
+        };
 
-    config_cmd(None).await
+        print_res(res)
+    } else {
+        let res = config_cmd(None).await;
+        print_res(res)
+    };
+
+    if !ok {
+        std::process::exit(1);
+    }
 }
