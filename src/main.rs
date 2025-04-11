@@ -47,7 +47,7 @@ enum Subs {
 type IpMap = Vec<(Vec<String>, String)>;
 
 async fn update_dns_cmd(domains: Vec<String>, token: String) -> Result<IpMap, String> {
-    let duckdns = DuckDns::new();
+    let duckdns = DuckDns::default();
     let ipify = Ipify::default();
 
     let res = match ipify.ipv6().await {
@@ -81,7 +81,7 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
     };
 
     let mut map = vec![];
-    let duckdns = DuckDns::new();
+    let duckdns = DuckDns::default();
     let ipify = Ipify::default();
 
     for domain in cfg.domains {
