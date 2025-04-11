@@ -16,7 +16,7 @@ impl DuckDns {
     // Main entry point to update DuckDNS records (IP or TXT)
     pub async fn update(
         &self,
-        domains: Vec<String>,
+        domains: &[String],
         token: String,
         ip: Option<String>,
         ipv6: Option<String>,
@@ -30,7 +30,7 @@ impl DuckDns {
     // Main entry point to update DuckDNS TXT record
     pub async fn update_txt(
         &self,
-        domains: Vec<String>,
+        domains: &[String],
         token: String,
         txt: String,
         verbose: Option<bool>,
@@ -43,7 +43,7 @@ impl DuckDns {
     // Build parameters for updating IP and IPv6 records
     fn build_params(
         &self,
-        domains: Vec<String>,
+        domains: &[String],
         token: String,
         ip: Option<String>,
         ipv6: Option<String>,
@@ -76,7 +76,7 @@ impl DuckDns {
     // Build parameters specifically for updating TXT records
     fn build_txt_params(
         &self,
-        domains: Vec<String>,
+        domains: &[String],
         token: String,
         txt: String,
         verbose: Option<bool>,
