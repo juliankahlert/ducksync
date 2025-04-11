@@ -1,13 +1,18 @@
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use ducksync::config::{Config, Ip};
 use ducksync::duckdns::DuckDns;
 use ducksync::ipify::Ipify;
+use env_logger::Env;
+use log::{error, info, trace};
 
 #[derive(Parser, Debug)]
 #[command(name = "ducksync")]
 struct Args {
     #[command(subcommand)]
     command: Option<Subs>,
+    /// Verbosity (-v, -vv, -vvv, etc.)
+    #[arg(short, action = ArgAction::Count)]
+    verbose: u8,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -83,7 +88,10 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
         if let Some(Ip::Public) = domain.ip {
             let res = match ipify.ipv6().await {
                 Ok(ip) => Ok(ip),
-                Err(_) => ipify.ipv4().await,
+                Err(e) => {
+                    trace!("Could not resolve IPv6: {}", e);
+                    ipify.ipv4().await
+                },
             };
 
             let Ok(ip) = res else {
@@ -91,7 +99,7 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
             };
 
             let domains = vec![domain.name.clone()];
-            if let Err(_) = duckdns
+            if let Err(e) = duckdns
                 .update(
                     &domains,
                     domain.token,
@@ -102,6 +110,7 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
                 )
                 .await
             {
+                error!("{}", e);
                 continue;
             }
 
@@ -115,12 +124,12 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
 fn print_res(res: Result<IpMap, String>) -> bool {
     match res {
         Err(e) => {
-            eprintln!("{}", e);
+            error!("{}", e);
             false
         }
         Ok(ip_map) => {
             for m in ip_map {
-                println!("{:?} => {}", m.0, m.1);
+                info!("{:?} => {}", m.0, m.1);
             }
             true
         }
@@ -130,6 +139,15 @@ fn print_res(res: Result<IpMap, String>) -> bool {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+    let log_level = match args.verbose {
+        0 => "",
+        1 => "info",
+        2 => "debug",
+        _ => "trace",
+    };
+
+    env_logger::Builder::from_env(Env::default().default_filter_or(log_level)).init();
+
     let ok = if let Some(sub) = args.command {
         let res = match sub {
             Subs::Config { config } => config_cmd(Some(config)).await,
