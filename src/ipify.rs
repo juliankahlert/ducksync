@@ -50,3 +50,25 @@ impl<F: IpFetcher> Ipify<F> {
         ip_str.parse::<IpAddr>().map_err(|e| e.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::IpAddr;
+
+    struct MockFetcher;
+
+    #[async_trait::async_trait]
+    impl IpFetcher for MockFetcher {
+        async fn fetch_ip(&self, _url: &str) -> Result<String, String> {
+            Ok("127.0.0.1".to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ipv4_mock() {
+        let ipify = Ipify::new(MockFetcher {});
+        let result = ipify.ipv4().await;
+        assert_eq!(result.unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
+    }
+}
