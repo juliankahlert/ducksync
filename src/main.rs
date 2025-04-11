@@ -48,7 +48,7 @@ type IpMap = Vec<(Vec<String>, String)>;
 
 async fn update_dns_cmd(domains: Vec<String>, token: String) -> Result<IpMap, String> {
     let duckdns = DuckDns::new();
-    let ipify = Ipify::new();
+    let ipify = Ipify::default();
 
     let res = match ipify.ipv6().await {
         Ok(ip) => Ok(ip),
@@ -82,7 +82,7 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
 
     let mut map = vec![];
     let duckdns = DuckDns::new();
-    let ipify = Ipify::new();
+    let ipify = Ipify::default();
 
     for domain in cfg.domains {
         if let Some(Ip::Public) = domain.ip {
@@ -91,7 +91,7 @@ async fn config_cmd(file: Option<String>) -> Result<IpMap, String> {
                 Err(e) => {
                     trace!("Could not resolve IPv6: {}", e);
                     ipify.ipv4().await
-                },
+                }
             };
 
             let Ok(ip) = res else {
