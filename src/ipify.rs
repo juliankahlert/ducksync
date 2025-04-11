@@ -1,18 +1,40 @@
-use reqwest::Client;
+use async_trait::async_trait;
 use std::net::IpAddr;
 
-const IPIFY_API4: &'static str = "https://api.ipify.org?format=text";
-const IPIFY_API6: &'static str = "https://api6.ipify.org?format=text";
+const IPIFY_API4: &str = "https://api.ipify.org?format=text";
+const IPIFY_API6: &str = "https://api6.ipify.org?format=text";
 
-pub struct Ipify {
-    client: Client,
+#[async_trait]
+pub trait IpFetcher: Send + Sync {
+    async fn fetch_ip(&self, url: &str) -> Result<String, String>;
 }
 
-impl Ipify {
-    pub fn new() -> Self {
-        Ipify {
-            client: Client::new(),
-        }
+#[async_trait]
+impl IpFetcher for reqwest::Client {
+    async fn fetch_ip(&self, url: &str) -> Result<String, String> {
+        self.get(url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .text()
+            .await
+            .map_err(|e| e.to_string())
+    }
+}
+
+pub struct Ipify<F: IpFetcher> {
+    fetcher: F,
+}
+
+impl Default for Ipify<reqwest::Client> {
+    fn default() -> Self {
+        Ipify::new(reqwest::Client::new())
+    }
+}
+
+impl<F: IpFetcher> Ipify<F> {
+    pub fn new(fetcher: F) -> Self {
+        Ipify { fetcher }
     }
 
     pub async fn ipv4(&self) -> Result<IpAddr, String> {
@@ -24,16 +46,29 @@ impl Ipify {
     }
 
     async fn get(&self, url: &str) -> Result<IpAddr, String> {
-        let public_ip: String = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .text()
-            .await
-            .map_err(|e| e.to_string())?;
+        let ip_str = self.fetcher.fetch_ip(url).await?;
+        ip_str.parse::<IpAddr>().map_err(|e| e.to_string())
+    }
+}
 
-        public_ip.parse::<IpAddr>().map_err(|e| e.to_string())
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::IpAddr;
+
+    struct MockFetcher;
+
+    #[async_trait::async_trait]
+    impl IpFetcher for MockFetcher {
+        async fn fetch_ip(&self, _url: &str) -> Result<String, String> {
+            Ok("127.0.0.1".to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ipv4_mock() {
+        let ipify = Ipify::new(MockFetcher {});
+        let result = ipify.ipv4().await;
+        assert_eq!(result.unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
     }
 }
