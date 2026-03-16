@@ -166,7 +166,7 @@ mod tests {
         let duck = DuckDns::new(client);
         let result = duck
             .update(
-                &vec!["example".to_string()],
+                &["example".to_string()],
                 "test-token".to_string(),
                 Some("1.2.3.4".to_string()),
                 None,
@@ -184,7 +184,7 @@ mod tests {
         let duck = DuckDns::new(client);
         let result = duck
             .update(
-                &vec!["example".to_string()],
+                &["example".to_string()],
                 "bad-token".to_string(),
                 None,
                 None,

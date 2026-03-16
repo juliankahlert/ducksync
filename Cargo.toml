@@ -1,7 +1,46 @@
 [package]
-name = "ducksync"
-version = "0.1.0"
-edition = "2024"
+name        = "ducksync"
+version     = "0.1.0"
+edition     = "2024"
+description = "A Duck DNS sync daemon with REST and DBus API"
+license     = "MIT"
+homepage    = "https://github.com/juliankahlert/ducksync"
+repository  = "https://github.com/juliankahlert/ducksync"
+authors     = ["Julian Kahlert"]
+readme      = "README.md"
+
+[package.metadata.deb]
+maintainer = "Julian Kahlert <julian.kahlert@protonmail.com>"
+section    = "net"
+priority   = "optional"
+depends    = "$auto"
+assets     = [
+    ["target/release/ducksync", "/usr/bin/ducksync", "755"],
+    ["README.md", "/usr/share/doc/ducksync/README.md", "644"],
+    ["LICENSE", "/usr/share/doc/ducksync/LICENSE", "644"],
+]
+
+[package.metadata.generate-rpm]
+summary = "A Duck DNS sync daemon with REST and DBus API"
+license = "MIT"
+release = "1"
+
+[[package.metadata.generate-rpm.assets]]
+source = "target/release/ducksync"
+dest   = "/usr/bin/ducksync"
+mode   = "755"
+
+[[package.metadata.generate-rpm.assets]]
+source = "README.md"
+dest   = "/usr/share/doc/ducksync/README.md"
+mode   = "644"
+doc    = true
+
+[[package.metadata.generate-rpm.assets]]
+source = "LICENSE"
+dest   = "/usr/share/doc/ducksync/LICENSE"
+mode   = "644"
+doc    = true
 
 [profile.release]
 lto = true
